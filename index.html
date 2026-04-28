@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#050506" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>lab-rats-prototype-v94.html</title>
+<title>lab-rats-prototype-v95.html</title>
 <style>
 :root{
   --bg:#0d0d10; --panel:#17181d; --tile:#e8e6dc; --tile2:#cfcfc7; --path:#111113;
@@ -1082,9 +1082,58 @@ let rotCursorTile=null, rotCursorMode='noAction';
 let dragTileState=null;
 let lastTroopUpgradeReady=false;
 let playMode='solo', localTeam='A', isHost=false, peer=null, conn=null, connected=false, remoteSnapshotAt=0, lastBroadcastAt=0, lastCursorSentAt=0;
+const REMOTE_INTERP_DELAY_MS=120;
+let remoteVisualPrev=null, remoteVisualNext=null;
 function key(x,y){return x+','+y} function inb(x,y){return x>=1&&x<=W&&y>=1&&y<=H}
 function testSitePos(){return state?.testSite?{x:state.testSite.x,y:state.testSite.y}:CENTER;}
 function man(a,b=null){b=b||testSitePos(); return Math.abs(a.x-b.x)+Math.abs(a.y-b.y)}
+
+function snapshotUnitVisualPosition(u){
+  if(u?.move){
+    const m=u.move, p=Math.max(0,Math.min(1,Number(m.progress)||0));
+    return {x:m.from.x+(m.to.x-m.from.x)*p,y:m.from.y+(m.to.y-m.from.y)*p};
+  }
+  return {x:u?.x||0,y:u?.y||0};
+}
+function buildRemoteVisualFrame(remoteState,at=performance.now()){
+  const units=new Map();
+  for(const u of (remoteState?.units||[]).filter(u=>!u.dead)){
+    const pos=snapshotUnitVisualPosition(u);
+    let facing=null;
+    if(u.move){
+      const dx=u.move.to.x-u.move.from.x, dy=u.move.to.y-u.move.from.y;
+      const d=DIRS.find(dd=>dd.dx===dx&&dd.dy===dy);
+      facing=({n:180,e:270,s:0,w:90})[d?.k||'s'];
+    } else if(u.dir){
+      facing=({n:180,e:270,s:0,w:90})[u.dir.k||'s'];
+    }
+    units.set(String(u.id),{x:pos.x,y:pos.y,facing,move:!!u.move});
+  }
+  return {at,units};
+}
+function pushRemoteVisualFrame(remoteState,at=performance.now()){
+  const frame=buildRemoteVisualFrame(remoteState,at);
+  if(!remoteVisualNext){remoteVisualPrev=frame; remoteVisualNext=frame; return;}
+  remoteVisualPrev=remoteVisualNext;
+  remoteVisualNext=frame;
+}
+function remoteVisualSample(u){
+  if(playMode!=='join'||!remoteVisualPrev||!remoteVisualNext)return null;
+  const next=remoteVisualNext.units.get(String(u.id));
+  if(!next)return null;
+  const prev=remoteVisualPrev.units.get(String(u.id))||next;
+  const dx=next.x-prev.x, dy=next.y-prev.y;
+  if(Math.hypot(dx,dy)>1.35)return next;
+  const span=Math.max(40,remoteVisualNext.at-remoteVisualPrev.at||90);
+  const renderAt=performance.now()-REMOTE_INTERP_DELAY_MS;
+  const t=Math.max(0,Math.min(1,(renderAt-remoteVisualPrev.at)/span));
+  let facing=next.facing;
+  if(Math.abs(dx)+Math.abs(dy)>.025){
+    if(Math.abs(dx)>Math.abs(dy))facing=dx>0?270:90;
+    else facing=dy>0?0:180;
+  }
+  return {x:prev.x+dx*t,y:prev.y+dy*t,facing,move:next.move||prev.move||t<1};
+}
 function visualLead(){if(!state||!running||paused||state.ended)return 0; if(playMode==='join')return Math.min(.25,(performance.now()-remoteSnapshotAt)/1000); return acc;}
 function visualTime(){return state?state.time+visualLead():0;}
 function smoothTimer(current,interval){return Math.max(0,Math.min(interval,current+visualLead()));}
@@ -1131,7 +1180,7 @@ function sendToPeer(msg){if(conn&&conn.open)conn.send(msg);}
 function sendCursor(e,visible=true){if(playMode==='solo'||!conn||!conn.open)return; const now=performance.now(); if(visible&&now-lastCursorSentAt<45)return; lastCursorSentAt=now; const r=boardEl.getBoundingClientRect(); const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height; sendToPeer({type:'cursor',team:localTeam,x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y)),visible});}
 function renderRemoteCursor(msg){if(!remoteCursor)return; if(!msg||!msg.visible){remoteCursor.classList.remove('show'); return;} const r=boardEl.getBoundingClientRect(); remoteCursor.className='remoteCursor show '+(msg.team||''); remoteCursor.style.left=(msg.x*r.width)+'px'; remoteCursor.style.top=(msg.y*r.height)+'px';}
 function broadcastState(force=false){if(playMode!=='host'||!conn||!conn.open||!state)return; const now=performance.now(); if(!force&&now-lastBroadcastAt<90)return; lastBroadcastAt=now; conn.send({type:'state',state,uid,rid,running,paused,debugOn,balance:balanceSnapshot()});}
-function applyRemoteState(msg){state=msg.state; if(msg.balance)applyBalanceSnapshot(msg.balance); uid=msg.uid||uid; rid=msg.rid||rid; running=!!msg.running; paused=!!msg.paused; remoteSnapshotAt=performance.now(); if(state&&state.rotationAnim){if(lastSeenRotationAnimId!==state.rotationAnim.id){lastSeenRotationAnimId=state.rotationAnim.id; remoteRotationAnimStartedAt=performance.now();} state.rotationAnim.startedAt=remoteRotationAnimStartedAt;} else {lastSeenRotationAnimId=null; remoteRotationAnimStartedAt=null;} markBoardDirty(); renderAll(); renderEndState();}
+function applyRemoteState(msg){const now=performance.now(); if(playMode==='join')pushRemoteVisualFrame(msg.state,now); state=msg.state; if(msg.balance)applyBalanceSnapshot(msg.balance); uid=msg.uid||uid; rid=msg.rid||rid; running=!!msg.running; paused=!!msg.paused; remoteSnapshotAt=now; if(state&&state.rotationAnim){if(lastSeenRotationAnimId!==state.rotationAnim.id){lastSeenRotationAnimId=state.rotationAnim.id; remoteRotationAnimStartedAt=now;} state.rotationAnim.startedAt=remoteRotationAnimStartedAt;} else {lastSeenRotationAnimId=null; remoteRotationAnimStartedAt=null;} markBoardDirty(); renderAll(); renderEndState();}
 function cloneBoard(board){return board.map(t=>({...t}))}
 function tileAt(board,x,y){return board[(y-1)*W+(x-1)]}
 function openings(t){
@@ -1227,7 +1276,7 @@ function spawnOddsText(p){const w=spawnWeights(p); return UNIT_ORDER.map(cls=>`$
 function newPlayer(team){return {team,score:0,scoreMeter:0,spawnTimer:0,spawnInterval:PLAYER_SPAWN_INTERVAL,mazeTimer:PLAYER_MAZE_INTERVAL,mazeInterval:PLAYER_MAZE_INTERVAL,mazeActions:PLAYER_MAZE_CAP,mazeCap:PLAYER_MAZE_CAP,up:0,xp:0,unitLevel:{grunt:1,runner:0,bruiser:0},nextSpawn:'grunt',queuedUp:[],claimedCheese:0,npcEval:0,npcMemory:{},lastReason:'',lastScores:[],tileBag:[],currentTile:null,nextTile:null}}
 function init(){
   const dbg=$('#debug'); if(dbg){delete dbg.dataset.built; dbg.innerHTML='';}
-  uid=1; rid=1; localScoreFx=[]; scoreFxCarry=0; localDeathSplats=[]; deathSplatSeq=1; let board=[];
+  uid=1; rid=1; localScoreFx=[]; scoreFxCarry=0; localDeathSplats=[]; deathSplatSeq=1; remoteVisualPrev=null; remoteVisualNext=null; let board=[];
   const buildBoard=()=>{const b=[]; for(let y=1;y<=H;y++)for(let x=1;x<=W;x++){let o=Math.floor(Math.random()*4); if(y===2)o=2; if(y===4)o=0; if(x===3&&y===1)o=0; if(x===3&&y===5)o=2; b.push({x,y,type:'t',o});} return b;};
   board=buildBoard();
   state={board,players:{A:newPlayer('A'),B:newPlayer('B')},units:[],relics:[],lastChanged:null,pendingRotation:null,rotationAnim:null,time:0,relicTimer:0,ended:false,winner:null,events:[],centerFightSeen:0,boardDirty:true,lastRotateDebug:null,testSite:null};
@@ -1616,10 +1665,10 @@ function renderLocalTargetIcons(){
   }
   [...unitLayer.querySelectorAll('.pathTargetIcon')].forEach(el=>{if(!live.has(el.dataset.pathTargetKey||''))el.remove();});
 }
-function visualUnitPosition(u){if(u.move){const m=u.move, p=Math.max(0,Math.min(1,m.progress)); return {x:m.from.x+(m.to.x-m.from.x)*p,y:m.from.y+(m.to.y-m.from.y)*p};} return {x:u.x,y:u.y};}
-function ratSpriteFrame(u,fighting){return (u.move||fighting)?(Math.floor(performance.now()/160 + (u.id%2))%2):0;}
+function visualUnitPosition(u){const remote=remoteVisualSample(u); if(remote)return {x:remote.x,y:remote.y}; if(u.move){const m=u.move, p=Math.max(0,Math.min(1,m.progress)); return {x:m.from.x+(m.to.x-m.from.x)*p,y:m.from.y+(m.to.y-m.from.y)*p};} return {x:u.x,y:u.y};}
+function ratSpriteFrame(u,fighting){const remote=remoteVisualSample(u); return ((remote&&remote.move)||u.move||fighting)?(Math.floor(performance.now()/160 + (u.id%2))%2):0;}
 function ratSpritePos(team,cls,frame){const row=team==='A'?0:1; const base=cls==='grunt'?0:(cls==='runner'?2:4); const col=base+(frame?1:0); return {sx:(col/5)*100, sy:row?100:0};}
-function ratFacingDeg(u){let dir=u.dir; if(u.move){const dx=u.move.to.x-u.move.from.x, dy=u.move.to.y-u.move.from.y; dir=DIRS.find(d=>d.dx===dx&&d.dy===dy)||dir;} return ({n:180,e:270,s:0,w:90})[dir?.k||'s'];}
+function ratFacingDeg(u){const remote=remoteVisualSample(u); if(remote&&Number.isFinite(remote.facing))return remote.facing; let dir=u.dir; if(u.move){const dx=u.move.to.x-u.move.from.x, dy=u.move.to.y-u.move.from.y; dir=DIRS.find(d=>d.dx===dx&&d.dy===dy)||dir;} return ({n:180,e:270,s:0,w:90})[dir?.k||'s'];}
 function renderUnits(){
   if(!state||!unitLayer)return;
 
