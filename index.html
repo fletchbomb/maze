@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#050506" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>lab-rats-prototype-v89.html</title>
+<title>lab-rats-prototype-v94.html</title>
 <style>
 :root{
   --bg:#0d0d10; --panel:#17181d; --tile:#e8e6dc; --tile2:#cfcfc7; --path:#111113;
@@ -655,9 +655,315 @@ body.portraitFallback .troopBox.portraitUnit .fallbackShape.runner:after{transfo
 .tile.dropHover:after{
   z-index:13!important;
 }
+
+.tile.legalDrop:not(.dropHover):after{
+  content:none!important;
+}
+.tile.dropHover:not(.illegalDrop):after{
+  content:""!important;
+  position:absolute!important;
+  inset:3px!important;
+  border-radius:6px!important;
+  z-index:13!important;
+  pointer-events:none!important;
+  background:linear-gradient(145deg,rgba(94,227,154,.16),rgba(38,132,88,.05))!important;
+  box-shadow:inset 0 0 0 2px rgba(94,227,154,.96),0 0 0 1px rgba(255,255,255,.14),0 0 14px rgba(94,227,154,.30)!important;
+  animation:dropHoverPulse .72s ease-in-out infinite alternate!important;
+}
+@keyframes dropHoverPulse{
+  from{transform:scale(1); box-shadow:inset 0 0 0 2px rgba(94,227,154,.86),0 0 0 1px rgba(255,255,255,.12),0 0 10px rgba(94,227,154,.22);}
+  to{transform:scale(1.01); box-shadow:inset 0 0 0 3px rgba(94,227,154,1),0 0 0 1px rgba(255,255,255,.18),0 0 18px rgba(94,227,154,.38);}
+}
+
 @media(max-width:700px){
   .pathTargetIcon{width:14px!important;height:14px!important;}
   .pathTargetIcon::before{inset:-5px!important;}
+}
+
+
+/* --- v91 action readability: opponent tile slam + tile-chip charge ring --- */
+.tileCard.current{
+  --chargeColor:rgba(94,227,154,.92);
+  --chargeBg:rgba(255,255,255,.14);
+  overflow:visible!important;
+  filter:none!important;
+}
+.tileCard.current::after{
+  content:""!important;
+  position:absolute!important;
+  inset:-5px!important;
+  z-index:8!important;
+  border-radius:17px!important;
+  padding:3px!important;
+  pointer-events:none!important;
+  background:conic-gradient(var(--chargeColor) var(--readyPct,0%), var(--chargeBg) 0)!important;
+  clip-path:none!important;
+  mix-blend-mode:normal!important;
+  opacity:.96!important;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0)!important;
+  -webkit-mask-composite:xor!important;
+  mask-composite:exclude!important;
+  box-shadow:0 0 10px rgba(94,227,154,.18)!important;
+}
+.tileCard.current::before{
+  content:""!important;
+  position:absolute!important;
+  inset:-2px!important;
+  z-index:7!important;
+  border-radius:15px!important;
+  pointer-events:none!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 0 0 1px rgba(0,0,0,.45)!important;
+}
+.tileCard.current.cooling::after{
+  background:conic-gradient(rgba(94,227,154,.92) var(--readyPct,0%), rgba(255,255,255,.13) 0)!important;
+  box-shadow:0 0 10px rgba(94,227,154,.18)!important;
+}
+.tileCard.current.ready::after{
+  background:conic-gradient(rgba(242,183,53,.25),rgba(255,255,255,.95),rgba(242,183,53,.35),rgba(242,183,53,.25))!important;
+  box-shadow:0 0 16px rgba(242,183,53,.38),0 0 4px rgba(255,245,180,.36)!important;
+  animation:tileReadyRingSpin 1.15s linear infinite!important;
+}
+.tileCard.current.ready::before{
+  box-shadow:inset 0 0 0 2px rgba(242,183,53,.88),0 0 14px rgba(242,183,53,.32),0 0 0 1px rgba(0,0,0,.55)!important;
+}
+.tileCard.current.ready{
+  cursor:grab!important;
+  animation:tileReadyBreath 1.05s ease-in-out infinite!important;
+}
+.tileCard.current.dragging{
+  animation:none!important;
+}
+@keyframes tileReadyRingSpin{to{transform:rotate(360deg)}}
+@keyframes tileReadyBreath{
+  0%,100%{transform:translateY(-14px) scale(1)}
+  50%{transform:translateY(-15px) scale(1.025)}
+}
+
+/* Keep tile art clean: no yellow surface overlay, only external charge/ready border. */
+.tileCard.current.ready .miniTile,
+.tileCard.current.cooling .miniTile{filter:none!important}
+
+/* Board placement language: quick visible slam/ripple on the tile that changed. */
+.tile.lastChanged.opponentPlaced{
+  animation:opponentTileSlam .62s cubic-bezier(.16,1.15,.25,1) 1!important;
+}
+.tile.lastChanged.opponentPlaced:before{
+  content:""!important;
+  position:absolute!important;
+  inset:-5px!important;
+  border-radius:10px!important;
+  z-index:20!important;
+  pointer-events:none!important;
+  border:3px solid var(--a)!important;
+  box-shadow:0 0 0 2px rgba(255,255,255,.18),0 0 24px rgba(255,107,58,.54),inset 0 0 16px rgba(255,107,58,.20)!important;
+  animation:opponentTileRipple .68s cubic-bezier(.18,1,.25,1) 1 forwards!important;
+}
+.tile.lastChanged.opponentPlaced.placedB:before{
+  border-color:var(--b)!important;
+  box-shadow:0 0 0 2px rgba(255,255,255,.18),0 0 24px rgba(67,169,255,.54),inset 0 0 16px rgba(67,169,255,.20)!important;
+}
+.tile.lastChanged.opponentPlaced .tileArt{
+  animation:opponentTileArtPop .46s cubic-bezier(.18,1.35,.25,1) 1!important;
+}
+@keyframes opponentTileSlam{
+  0%{transform:translateY(-8px) scale(1.035);filter:brightness(1.28)}
+  38%{transform:translateY(2px) scale(.985);filter:brightness(1.12)}
+  66%{transform:translateY(-1px) scale(1.01)}
+  100%{transform:none;filter:none}
+}
+@keyframes opponentTileArtPop{
+  0%{filter:brightness(1.4) saturate(1.25)}
+  100%{filter:none}
+}
+@keyframes opponentTileRipple{
+  0%{opacity:1;transform:scale(.78)}
+  55%{opacity:.82;transform:scale(1.04)}
+  100%{opacity:0;transform:scale(1.18)}
+}
+
+
+
+/* --- v92: calm tile-ready affordance + single landing placement FX --- */
+/* Loaded tile now borrows the eligible-upgrade language without changing the tile art surface. */
+.tileCard.current.ready{
+  cursor:grab!important;
+  filter:none!important;
+  animation:none!important;
+  box-shadow:inset 0 1px 0 rgba(255,245,190,.35),inset 0 -5px 10px rgba(0,0,0,.62),0 9px 17px rgba(0,0,0,.56),0 0 0 2px rgba(242,183,53,.62),0 0 18px rgba(242,183,53,.34)!important;
+}
+.tileCard.current.ready::before{
+  inset:0!important;
+  border-radius:inherit!important;
+  box-shadow:inset 0 0 0 2px rgba(242,183,53,.88)!important;
+  background:none!important;
+  animation:none!important;
+}
+.tileCard.current.ready::after{
+  inset:-3px!important;
+  border-radius:16px!important;
+  padding:2px!important;
+  background:conic-gradient(rgba(242,183,53,.25),rgba(255,255,255,.95),rgba(242,183,53,.28),rgba(242,183,53,.25))!important;
+  box-shadow:none!important;
+  opacity:1!important;
+  animation:upgradeRingSpin 1.15s linear infinite!important;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0)!important;
+  -webkit-mask-composite:xor!important;
+  mask-composite:exclude!important;
+}
+.tileCard.current.ready .miniArt,
+.tileCard.current.ready .miniTile,
+.tileCard.current.cooling .miniArt,
+.tileCard.current.cooling .miniTile{
+  filter:none!important;
+}
+
+/* Replace the blink/ripple with a one-shot card landing motion. */
+.tile.lastChanged.opponentPlaced{
+  animation:none!important;
+  overflow:visible!important;
+  z-index:7!important;
+}
+.tile.lastChanged.opponentPlaced::before{
+  content:""!important;
+  position:absolute!important;
+  left:7px!important;
+  right:7px!important;
+  bottom:-8px!important;
+  height:16px!important;
+  border-radius:50%!important;
+  z-index:13!important;
+  pointer-events:none!important;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.46),rgba(0,0,0,0) 70%)!important;
+  border:0!important;
+  box-shadow:none!important;
+  animation:tileLandingShadow .52s cubic-bezier(.18,1,.24,1) 1 forwards!important;
+}
+.tile.lastChanged.opponentPlaced::after{
+  content:""!important;
+  position:absolute!important;
+  inset:2px!important;
+  border-radius:7px!important;
+  z-index:18!important;
+  pointer-events:none!important;
+  border:2px solid var(--a)!important;
+  background:none!important;
+  box-shadow:0 0 18px rgba(255,107,58,.50),inset 0 0 14px rgba(255,107,58,.20)!important;
+  animation:tileLandingEdge .62s ease-out 1 forwards!important;
+}
+.tile.lastChanged.opponentPlaced.placedB::after{
+  border-color:var(--b)!important;
+  box-shadow:0 0 18px rgba(67,169,255,.50),inset 0 0 14px rgba(67,169,255,.20)!important;
+}
+.tile.lastChanged.opponentPlaced .tileArt{
+  z-index:16!important;
+  animation:tileLandOnTop .54s cubic-bezier(.17,1.18,.24,1) 1!important;
+  filter:none!important;
+  transform-origin:center!important;
+}
+@keyframes tileLandOnTop{
+  0%{transform:translateY(-24px) scale(1.06);filter:brightness(1.16) drop-shadow(0 18px 16px rgba(0,0,0,.40));}
+  48%{transform:translateY(2px) scale(.992);filter:brightness(1.08) drop-shadow(0 3px 5px rgba(0,0,0,.30));}
+  72%{transform:translateY(-1px) scale(1.006);filter:brightness(1.04) drop-shadow(0 5px 7px rgba(0,0,0,.22));}
+  100%{transform:translateY(0) scale(1);filter:none;}
+}
+@keyframes tileLandingShadow{
+  0%{opacity:.08;transform:scale(.62);}
+  46%{opacity:.52;transform:scale(1.05);}
+  100%{opacity:0;transform:scale(1.22);}
+}
+@keyframes tileLandingEdge{
+  0%{opacity:0;transform:scale(.92);}
+  38%{opacity:1;transform:scale(1);}
+  100%{opacity:0;transform:scale(1.025);}
+}
+
+
+
+/* --- v93 Action Affordance System ---
+   Shared states:
+   - uiActionCharging: progress shown around an action without changing its art.
+   - uiActionReady: static gold border/glow matching upgrade eligibility; no rotating ring.
+   - placementLandingFx: one-shot board placement feedback.
+*/
+:root{
+  --ui-ready-gold:rgba(242,183,53,.88);
+  --ui-ready-gold-soft:rgba(242,183,53,.34);
+  --ui-ready-highlight:rgba(255,245,190,.35);
+  --ui-ready-shadow:rgba(0,0,0,.56);
+}
+
+/* Ready affordance: one gold glow language, no spinner. */
+.uiActionReady{
+  box-shadow:inset 0 1px 0 var(--ui-ready-highlight),inset 0 -5px 10px rgba(0,0,0,.62),0 9px 17px var(--ui-ready-shadow),0 0 0 2px rgba(242,183,53,.62),0 0 18px var(--ui-ready-gold-soft)!important;
+  animation:uiActionReadyPulse 1.05s ease-in-out infinite!important;
+}
+.uiActionReady::after{
+  animation:none!important;
+}
+@keyframes uiActionReadyPulse{
+  0%,100%{box-shadow:inset 0 1px 0 var(--ui-ready-highlight),inset 0 -5px 10px rgba(0,0,0,.62),0 9px 17px var(--ui-ready-shadow),0 0 0 2px rgba(242,183,53,.56),0 0 14px rgba(242,183,53,.24)}
+  50%{box-shadow:inset 0 1px 0 rgba(255,245,190,.5),inset 0 -5px 10px rgba(0,0,0,.62),0 11px 20px rgba(0,0,0,.62),0 0 0 3px rgba(242,183,53,.76),0 0 24px rgba(242,183,53,.46)}
+}
+
+/* Tile-specific mapping: charging ring only while charging; ready gets the same static glow as upgrade buttons. */
+.tileCard.current.uiActionCharging::after{
+  content:""!important;
+  position:absolute!important;
+  inset:-5px!important;
+  z-index:8!important;
+  border-radius:17px!important;
+  padding:3px!important;
+  pointer-events:none!important;
+  background:conic-gradient(rgba(94,227,154,.92) var(--readyPct,0%), rgba(255,255,255,.13) 0)!important;
+  opacity:.96!important;
+  box-shadow:0 0 10px rgba(94,227,154,.18)!important;
+  animation:none!important;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0)!important;
+  -webkit-mask-composite:xor!important;
+  mask-composite:exclude!important;
+}
+.tileCard.current.uiActionReady::after{
+  content:none!important;
+  display:none!important;
+  animation:none!important;
+  background:none!important;
+  box-shadow:none!important;
+}
+.tileCard.current.uiActionReady::before{
+  content:""!important;
+  position:absolute!important;
+  inset:0!important;
+  z-index:7!important;
+  border-radius:inherit!important;
+  pointer-events:none!important;
+  background:none!important;
+  box-shadow:inset 0 0 0 2px var(--ui-ready-gold)!important;
+  animation:none!important;
+}
+.tileCard.current.uiActionReady,
+.tileCard.current.ready{
+  cursor:grab!important;
+  filter:none!important;
+}
+.tileCard.current.uiActionReady .miniArt,
+.tileCard.current.uiActionReady .miniTile,
+.tileCard.current.uiActionCharging .miniArt,
+.tileCard.current.uiActionCharging .miniTile{
+  filter:none!important;
+}
+.tileCard.current.dragging.uiActionReady,
+.tileCard.current.dragging.uiActionCharging{
+  animation:none!important;
+}
+
+/* Upgrade buttons now explicitly consume the same action-ready system class. */
+.troopBox.uiActionReady{
+  border-color:var(--ui-ready-gold)!important;
+}
+.troopBox.uiActionReady::after{
+  content:none!important;
+  display:none!important;
+  animation:none!important;
 }
 
 </style>
@@ -769,6 +1075,7 @@ const $=s=>document.querySelector(s); const boardEl=$('#board'), unitLayer=$('#u
 let state, acc=0, last=0, running=false, paused=false, debugOn=false, uid=1, rid=1;
 let localScoreFx=[], scoreFxSeq=1, scoreFxCarry=0;
 let localDeathSplats=[], deathSplatSeq=1;
+let lastPlacementFxKeySeen=null;
 const uiRevealState=new Map();
 const FLOAT_FX_PRESETS={default:{text:'+',kind:null},goldPlus:{text:'+',kind:'goldPlus'}};
 let rotCursorTile=null, rotCursorMode='noAction';
@@ -982,7 +1289,7 @@ function tryPlaceTile(team,x,y,source='local'){
   p.mazeActions=0; p.mazeTimer=0;
   t.type=played.type; t.o=played.o;
   advanceTileDeck(p);
-  state.lastChanged={x,y,team,pending:false,placed:true};
+  state.lastChanged={x,y,team,pending:false,placed:true,source,fxBorn:performance.now()};
   state.lastRotateDebug={ok:true,team,x,y,source,oldType,oldOrientation,newOrientation:t.o,actionsLeft:p.mazeActions};
   if(playMode==='solo'&&team==='B') state.players.A.npcMemory[key(x,y)]=3;
   handleRotationRouteBreaks();
@@ -1233,7 +1540,13 @@ function addDeathSplat(u){emitBloodSplatter(u.x,u.y);}
 function renderDeathSplats(boardRect,pad,gap,cell){const now=performance.now(); localDeathSplats=localDeathSplats.filter(fx=>now-fx.born<fx.life); const live=new Set(); for(const fx of localDeathSplats){const age=now-fx.born; const t=Math.max(0,Math.min(1,age/fx.life)); const sinkT=Math.max(0,Math.min(1,(age-fx.sinkStart)/Math.max(1,fx.life-fx.sinkStart))); const left=pad+(fx.x-1)*(cell+gap)+cell/2; const top=pad+(fx.y-1)*(cell+gap)+cell/2+cell*.18*sinkT; let el=unitLayer.querySelector(`[data-blood-id="${fx.id}"]`); if(!el){el=document.createElement('div'); el.dataset.bloodId=fx.id; unitLayer.appendChild(el);} el.className='bloodSplat'; el.style.left=left+'px'; el.style.top=top+'px'; el.style.width=(cell*(fx.size||.42))+'px'; el.style.height=(cell*(fx.size||.42))+'px'; el.style.setProperty('--splatScale',String((fx.scale||1)*(1-.12*sinkT))); el.style.setProperty('--splatRot',fx.rot+'deg'); el.style.setProperty('--splatOpacity',String((1-Math.max(0,(t-.76)/.24))*(fx.opacity||.72))); el.style.setProperty('--sinkT',String(sinkT)); el.style.setProperty('--drainOpacity',String((fx.drip?(0.18+0.72*sinkT):0)*.92)); el.style.setProperty('--drainScale',String(.18+1.08*sinkT)); live.add(String(fx.id)); } [...unitLayer.querySelectorAll('[data-blood-id]')].forEach(el=>{if(!live.has(el.dataset.bloodId))el.remove();});}
 function renderAll(){if(!state||state.boardDirty){renderBoard(); if(state)state.boardDirty=false;} renderBoardLocal(); renderUnits(); renderTop(); renderSpawn(); renderUpgrades(); if(debugOn)renderDebug(); renderEndState();}
 function renderLiveMeters(){if(!state)return; const P=me()||state.players.A; const spawnRing=$('#spawnRing'); if(spawnRing)spawnRing.style.setProperty('--p',`${smoothDeg(P.spawnTimer,P.spawnInterval)}deg`); const hand=$('#tileHand'); if(hand)hand.style.setProperty('--p',`${P.mazeActions>=1?360:smoothDeg(P.mazeTimer,P.mazeInterval)}deg`); const mazeBubble=$('#mazeBubble'); if(mazeBubble){mazeBubble.textContent=P.mazeActions>=1?'✓':'…'; mazeBubble.style.display=SHOW_ROTATE_TIMER?'grid':'none';} const relicRing=$('#relicRing'); if(relicRing)relicRing.style.setProperty('--p',`${smoothDeg(state.relicTimer,RELIC_SPAWN_INTERVAL)}deg`); const upRing=$('#upgradeRing'); if(upRing)upRing.style.setProperty('--p',`${P.up>0?360:Math.min(360,(P.xp/UPGRADE_XP_COST)*360)}deg`); updateRotCursorVisual(); renderTileHand(); renderTroopPanel(); const st=$('#statusLine'); if(st){st.textContent=paused?'paused':''; st.style.display=paused?'':'none';}}
-function renderBoard(){const flowA=routeOrFallback('A'), flowB=routeOrFallback('B'); boardEl.innerHTML=''; for(let y=1;y<=5;y++)for(let x=1;x<=5;x++){const t=tileAt(state.board,x,y), anim=rotationVisualFor(x,y), visualT=anim?{...t,o:anim.oldOrientation}:t, o=openings(visualT), div=document.createElement('div'); div.className='tile'; div.dataset.x=x;div.dataset.y=y; const isSite=isCenterTile(x,y), previewSite=isPreviewTestSite(x,y); if(isSite){div.classList.add('center'); if(previewSite)div.classList.add('testPreview'); if(anim&&anim.auto)div.classList.add('autoBurst');} if(x===3&&y===1)div.classList.add('spawnA'); if(x===3&&y===5)div.classList.add('spawnB'); if(state.lastChanged&&state.lastChanged.x===x&&state.lastChanged.y===y){div.classList.add('lastChanged'); if(state.lastChanged.pending)div.classList.add('pending');} const lp=me(); if(lp&&lp.mazeActions>0&&!state.pendingRotation){if(!isTilePlayerRotatable(x,y))div.classList.add('locked'); else div.classList.add('canAct');} else div.classList.add('noAction'); const fk=key(x,y), inA=flowA.path.has(fk), inB=flowB.path.has(fk); const pathGlow=(SHOW_PATH_GLOW&&(inA||inB))?'pathGlow':''; const openClasses=DIRS.filter(d=>o[d.k]).map(d=>'open-'+d.k).join(' '); div.innerHTML+=`<div class="tileArt ${openClasses} ${pathGlow} ${anim?'rotatingClockwise':''} ${(anim&&anim.auto)?'autoCenter':''}"><div class="mazePassage n"></div><div class="mazePassage e"></div><div class="mazePassage s"></div><div class="mazePassage w"></div><div class="mazeFloor"></div><div class="mazeCorner nw"></div><div class="mazeCorner ne"></div><div class="mazeCorner sw"></div><div class="mazeCorner se"></div></div><div class="lockMark"></div>`; if(isSite){const site=state.testSite, hpPct=site?Math.max(0,Math.min(100,(site.hp/(site.maxHp||TEST_SITE_POINTS))*100)):100; div.innerHTML+=`<div class="centerObjective" style="--siteHp:${hpPct}%"><b>${site&&site.active?Math.ceil(site.hp):'?'}</b></div>`;} if(x===3&&y===1){div.innerHTML+='<div class="spawnMark"></div>'; const cls=state.players.A.nextSpawn; div.innerHTML+=`<div class="spawnGhost spawnA ${cls}" data-spawn-ghost="A" style="--spawnPct:${spawnPct('A')}%;--spawnDeg:${spawnPct('A')*3.6}deg"></div>`;} if(x===3&&y===5){div.innerHTML+='<div class="spawnMark"></div>'; const cls=state.players.B.nextSpawn; div.innerHTML+=`<div class="spawnGhost spawnB ${cls}" data-spawn-ghost="B" style="--spawnPct:${spawnPct('B')}%;--spawnDeg:${spawnPct('B')*3.6}deg"></div>`;} if(SHOW_PATH_GLOW&&(flowA.fallback===fk||flowB.fallback===fk))div.innerHTML+='<div class="fallbackDot"></div>'; const rel=state.relics.find(r=>r.x===x&&r.y===y); if(rel){const hpPct=Math.max(0,Math.min(100,(rel.hp/(rel.maxHp||8))*100)); div.innerHTML+=`<div class="cheese" data-cheese-id="${rel.id}" style="--cheeseHp:${hpPct}%"></div><div class="cheeseHpBar" data-cheese-hp="${rel.id}" style="--cheeseHp:${hpPct}%"><span></span></div>`;} const us=state.units.filter(u=>u.x===x&&u.y===y); const fighting=us.some(u=>u.team==='A')&&us.some(u=>u.team==='B'); if(fighting){div.classList.add('fighting'); div.innerHTML+='<div class="clash">✷</div>';} if(us.length>9)div.innerHTML+=`<div class="hpPeek">${us.length}</div>`; boardEl.appendChild(div);}}
+function renderBoard(){const flowA=routeOrFallback('A'), flowB=routeOrFallback('B'); boardEl.innerHTML=''; for(let y=1;y<=5;y++)for(let x=1;x<=5;x++){const t=tileAt(state.board,x,y), anim=rotationVisualFor(x,y), visualT=anim?{...t,o:anim.oldOrientation}:t, o=openings(visualT), div=document.createElement('div'); div.className='tile'; div.dataset.x=x;div.dataset.y=y; const isSite=isCenterTile(x,y), previewSite=isPreviewTestSite(x,y); if(isSite){div.classList.add('center'); if(previewSite)div.classList.add('testPreview'); if(anim&&anim.auto)div.classList.add('autoBurst');} if(x===3&&y===1)div.classList.add('spawnA'); if(x===3&&y===5)div.classList.add('spawnB'); if(state.lastChanged&&state.lastChanged.x===x&&state.lastChanged.y===y){
+  div.classList.add('lastChanged','placed'+state.lastChanged.team);
+  const placementFxKey=state.lastChanged.placed?`${state.lastChanged.x},${state.lastChanged.y},${state.lastChanged.team},${state.lastChanged.fxBorn||0}`:null;
+  const shouldPlayPlacementFx=!!(placementFxKey && !state.lastChanged.pending && state.lastChanged.team!==localTeam && placementFxKey!==lastPlacementFxKeySeen);
+  if(shouldPlayPlacementFx){div.classList.add('opponentPlaced'); lastPlacementFxKeySeen=placementFxKey;}
+  if(state.lastChanged.pending)div.classList.add('pending');
+} const lp=me(); if(lp&&lp.mazeActions>0&&!state.pendingRotation){if(!isTilePlayerRotatable(x,y))div.classList.add('locked'); else div.classList.add('canAct');} else div.classList.add('noAction'); const fk=key(x,y), inA=flowA.path.has(fk), inB=flowB.path.has(fk); const pathGlow=(SHOW_PATH_GLOW&&(inA||inB))?'pathGlow':''; const openClasses=DIRS.filter(d=>o[d.k]).map(d=>'open-'+d.k).join(' '); div.innerHTML+=`<div class="tileArt ${openClasses} ${pathGlow} ${anim?'rotatingClockwise':''} ${(anim&&anim.auto)?'autoCenter':''}"><div class="mazePassage n"></div><div class="mazePassage e"></div><div class="mazePassage s"></div><div class="mazePassage w"></div><div class="mazeFloor"></div><div class="mazeCorner nw"></div><div class="mazeCorner ne"></div><div class="mazeCorner sw"></div><div class="mazeCorner se"></div></div><div class="lockMark"></div>`; if(isSite){const site=state.testSite, hpPct=site?Math.max(0,Math.min(100,(site.hp/(site.maxHp||TEST_SITE_POINTS))*100)):100; div.innerHTML+=`<div class="centerObjective" style="--siteHp:${hpPct}%"><b>${site&&site.active?Math.ceil(site.hp):'?'}</b></div>`;} if(x===3&&y===1){div.innerHTML+='<div class="spawnMark"></div>'; const cls=state.players.A.nextSpawn; div.innerHTML+=`<div class="spawnGhost spawnA ${cls}" data-spawn-ghost="A" style="--spawnPct:${spawnPct('A')}%;--spawnDeg:${spawnPct('A')*3.6}deg"></div>`;} if(x===3&&y===5){div.innerHTML+='<div class="spawnMark"></div>'; const cls=state.players.B.nextSpawn; div.innerHTML+=`<div class="spawnGhost spawnB ${cls}" data-spawn-ghost="B" style="--spawnPct:${spawnPct('B')}%;--spawnDeg:${spawnPct('B')*3.6}deg"></div>`;} if(SHOW_PATH_GLOW&&(flowA.fallback===fk||flowB.fallback===fk))div.innerHTML+='<div class="fallbackDot"></div>'; const rel=state.relics.find(r=>r.x===x&&r.y===y); if(rel){const hpPct=Math.max(0,Math.min(100,(rel.hp/(rel.maxHp||8))*100)); div.innerHTML+=`<div class="cheese" data-cheese-id="${rel.id}" style="--cheeseHp:${hpPct}%"></div><div class="cheeseHpBar" data-cheese-hp="${rel.id}" style="--cheeseHp:${hpPct}%"><span></span></div>`;} const us=state.units.filter(u=>u.x===x&&u.y===y); const fighting=us.some(u=>u.team==='A')&&us.some(u=>u.team==='B'); if(fighting){div.classList.add('fighting'); div.innerHTML+='<div class="clash">✷</div>';} if(us.length>9)div.innerHTML+=`<div class="hpPeek">${us.length}</div>`; boardEl.appendChild(div);}}
 function renderBoardLocal(){
   if(!state)return;
 
@@ -1409,7 +1722,7 @@ function renderUnits(){
 }
 function tileOpenClasses(t){const o=openings(t||tTile(0)); return DIRS.filter(d=>o[d.k]).map(d=>'open-'+d.k).join(' ');}
 function miniTileHTML(t){return `<div class="miniArt ${tileOpenClasses(t)}"><div class="miniPassage n"></div><div class="miniPassage e"></div><div class="miniPassage s"></div><div class="miniPassage w"></div><div class="miniFloor"></div><div class="miniCorner nw"></div><div class="miniCorner ne"></div><div class="miniCorner sw"></div><div class="miniCorner se"></div></div>`;}
-function renderTileHand(){const p=me()||state?.players?.A; const cur=$('#currentTileCard'), next=$('#nextTileCard'); if(!p||!cur||!next)return; const pct=p.mazeActions>=1?100:Math.max(0,Math.min(100,smoothTimer(p.mazeTimer,p.mazeInterval)/p.mazeInterval*100)); cur.innerHTML=miniTileHTML(p.currentTile||tTile(0)); next.innerHTML=miniTileHTML(p.nextTile||tTile(0)); cur.style.setProperty('--readyPct',pct+'%'); cur.classList.toggle('ready',p.mazeActions>=1); cur.classList.toggle('cooling',p.mazeActions<1); cur.classList.toggle('dragging',!!dragTileState); const hand=$('#tileHand'); if(hand)hand.title=p.mazeActions>=1?'Drag current tile onto the maze':`Tile play charging ${Math.round(pct)}%`; const mb=$('#mazeBubble'); if(mb){mb.textContent=p.mazeActions>=1?'✓':Math.ceil(Math.max(0,p.mazeInterval-smoothTimer(p.mazeTimer,p.mazeInterval))); mb.style.display=SHOW_ROTATE_TIMER?'grid':'none';}}
+function renderTileHand(){const p=me()||state?.players?.A; const cur=$('#currentTileCard'), next=$('#nextTileCard'); if(!p||!cur||!next)return; const isReady=p.mazeActions>=1; const pct=isReady?100:Math.max(0,Math.min(100,smoothTimer(p.mazeTimer,p.mazeInterval)/p.mazeInterval*100)); cur.innerHTML=miniTileHTML(p.currentTile||tTile(0)); next.innerHTML=miniTileHTML(p.nextTile||tTile(0)); cur.style.setProperty('--readyPct',pct+'%'); cur.classList.toggle('ready',isReady); cur.classList.toggle('cooling',!isReady); cur.classList.toggle('uiActionReady',isReady); cur.classList.toggle('uiActionCharging',!isReady); cur.classList.toggle('dragging',!!dragTileState); const hand=$('#tileHand'); if(hand)hand.title=isReady?'Drag current tile onto the maze':`Tile play charging ${Math.round(pct)}%`; const mb=$('#mazeBubble'); if(mb){mb.textContent=isReady?'✓':Math.ceil(Math.max(0,p.mazeInterval-smoothTimer(p.mazeTimer,p.mazeInterval))); mb.style.display=SHOW_ROTATE_TIMER?'grid':'none';}}
 
 function fmtXP(v){return Number.isInteger(v)?String(v):Number(v).toFixed(2).replace(/\.?0+$/,'');}
 function routeOrFallback(team){const sp=spawnPoint(team), goal=testSitePos(), p=bfs(state.board,sp,goal); const set=new Set(); let fb=null; if(p){set.add(key(sp.x,sp.y)); p.forEach(n=>set.add(key(n.x,n.y)));} else {const f=fallback(state.board,sp); fb=key(f.x,f.y); const pp=bfs(state.board,sp,f)||[]; set.add(key(sp.x,sp.y)); pp.forEach(n=>set.add(key(n.x,n.y)));} return {path:set,fallback:fb};}
@@ -1456,7 +1769,7 @@ function renderTroopPanel(){
   for(const cls of UNIT_ORDER){
     const b=panel.querySelector(`[data-upgrade="${cls}"]`); if(!b)continue;
     const lvl=P.unitLevel[cls]||0, isBuilding=P.nextSpawn===cls, pct=isBuilding?spawnPct(P.team):0, req=buyReq(P,cls);
-    b.className='troopBox portraitUnit '+(P.team==='A'?'spawnA':'spawnB')+(lvl<=0&&!upgradeReady?' locked':'')+(upgradeReady&&req?' upgradeChoice':'');
+    b.className='troopBox portraitUnit '+(P.team==='A'?'spawnA':'spawnB')+(lvl<=0&&!upgradeReady?' locked':'')+(upgradeReady&&req?' upgradeChoice uiActionReady':'');
     b.style.setProperty('--buildPct',pct+'%');
     b.title=upgradeReady?`Upgrade ${UNIT_UPGRADE[cls].name} — Level ${lvl}`:`${UNIT_UPGRADE[cls].name} — Level ${lvl}${isBuilding?' — spawning':''}`;
     b.innerHTML=`<div class="portraitArt ${cls}" aria-hidden="true"></div><div class="shapeIcon fallbackShape ${cls}" aria-hidden="true"></div><b class="lvl">${lvl}</b>`;
@@ -1470,7 +1783,7 @@ function renderTroopPanel(){
     const enemy=otherTeam(P.team);
     const hasTarget=state.units.some(u=>!u.dead&&u.team===enemy&&u.x===site.x&&u.y===site.y);
     const enabled=upgradeReady&&hasTarget;
-    purge.className='troopBox purgeBox '+(enabled?'upgradeChoice':'locked');
+    purge.className='troopBox purgeBox '+(enabled?'upgradeChoice uiActionReady':'locked');
     purge.style.setProperty('--buildPct','0%');
     purge.title=enabled?'Purge enemy rats on the Test Site':'Purge — needs an upgrade and enemy rats on the Test Site';
     purge.innerHTML='<div class="shapeIcon purge"></div><b class="lvl">!</b>';
