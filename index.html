@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#050506" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>lab-rats-prototype-v95.html</title>
+<title>lab-rats-prototype-v96.html</title>
 <style>
 :root{
   --bg:#0d0d10; --panel:#17181d; --tile:#e8e6dc; --tile2:#cfcfc7; --path:#111113;
@@ -1205,6 +1205,93 @@ function sideCheeseFor(team){return state.relics.filter(r=>!r.claimed && (team==
 function nearestPathableRelic(board,start,relics=state.relics.filter(r=>!r.claimed)){let best=null; for(const r of relics){const p=bfs(board,start,{x:r.x,y:r.y}); if(p && (!best||p.length<best.p.length)) best={r,p};} return best;}
 function nearestPathableEnemy(board,start,team){let best=null; for(const e of state.units.filter(u=>!u.dead&&u.team!==team)){const p=bfs(board,start,{x:e.x,y:e.y}); if(p && (!best||p.length<best.p.length||p.length===best.p.length&&e.entered<best.e.entered)) best={e,p};} return best;}
 function teamHasCenterUnit(team){const t=testSitePos(); return state.units.some(u=>!u.dead&&u.team===team&&u.x===t.x&&u.y===t.y);}
+
+const TARGET_PREFS={
+  runner:{relic:110,center:70,enemy:20,dist:6,centerCrowd:1,enemyCrowd:1.5,cheeseCap:0},
+  grunt:{center:90,relic:55,enemy:45,dist:5,centerCrowd:1,enemyCrowd:1,cheeseCap:1},
+  bruiser:{center:95,enemy:85,relic:25,dist:5,centerCrowd:.5,enemyCrowd:.5,cheeseCap:1}
+};
+const CENTER_PRESSURE_PENALTY=[0,10,22,36,50];
+const CHEESE_ASSIGNED_PENALTY=80;
+const ENEMY_TARGET_PENALTY=18;
+function targetKey(kind,x,y,id=''){return `${kind}:${id||key(x,y)}`;}
+function targetingPrefs(unit){return TARGET_PREFS[unit.cls]||TARGET_PREFS.grunt;}
+function isCheeseSpecialist(unit){return unit.cls==='runner'||unit.mutations?.head==='cheeseAddict';}
+function targetCrowdCounts(excludeId=null){
+  const counts={center:new Map(),relic:new Map(),enemy:new Map()};
+  for(const u of state.units.filter(v=>!v.dead&&v.id!==excludeId&&v.target&&v.targetKind&&v.targetKind!=='fallback')){
+    if(u.targetKind==='center'){const k=targetKey('center',u.target.x,u.target.y); counts.center.set(k,(counts.center.get(k)||0)+1);}
+    if(u.targetKind==='relic'){const k=targetKey('relic',u.target.x,u.target.y); counts.relic.set(k,(counts.relic.get(k)||0)+1);}
+    if(u.targetKind==='enemy'){const k=targetKey('enemy',u.target.x,u.target.y,u.targetEnemyId); counts.enemy.set(k,(counts.enemy.get(k)||0)+1);}
+  }
+  return counts;
+}
+function buildTargetCandidates(unit,board=state.board){
+  const start={x:unit.x,y:unit.y};
+  const candidates=[];
+  const goal=testSitePos();
+  const centerPath=state.testSite?.active?bfs(board,start,goal):null;
+  if(centerPath)candidates.push({kind:'center',role:'score',id:'testSite',x:goal.x,y:goal.y,path:centerPath});
+  for(const r of state.relics.filter(r=>!r.claimed)){
+    const p=bfs(board,start,{x:r.x,y:r.y});
+    if(p)candidates.push({kind:'relic',role:'xp',id:r.id,x:r.x,y:r.y,path:p});
+  }
+  for(const e of state.units.filter(u=>!u.dead&&u.team!==unit.team)){
+    const p=bfs(board,start,{x:e.x,y:e.y});
+    if(p)candidates.push({kind:'enemy',role:'combat',id:e.id,x:e.x,y:e.y,path:p,targetEnemyId:e.id,entered:e.entered});
+  }
+  return candidates;
+}
+function scoreTargetCandidate(unit,cand,counts){
+  const prefs=targetingPrefs(unit);
+  const base=Number(prefs[cand.kind]??0);
+  let score=base - cand.path.length*(prefs.dist||5);
+  const sameTile=cand.x===unit.x&&cand.y===unit.y;
+  if(cand.kind==='enemy'){
+    if(sameTile)score+=100;
+    if(state.testSite?.active&&cand.x===state.testSite.x&&cand.y===state.testSite.y){
+      score+=unit.cls==='bruiser'?35:unit.cls==='grunt'?20:5;
+    }
+    const k=targetKey('enemy',cand.x,cand.y,cand.targetEnemyId);
+    score-=(counts.enemy.get(k)||0)*ENEMY_TARGET_PENALTY*(prefs.enemyCrowd??1);
+  }
+  if(cand.kind==='relic'){
+    if(sameTile)score+=unit.cls==='runner'?60:unit.cls==='grunt'?35:10;
+    const k=targetKey('relic',cand.x,cand.y);
+    const assigned=counts.relic.get(k)||0;
+    if(assigned>0&&!isCheeseSpecialist(unit))score-=CHEESE_ASSIGNED_PENALTY*(prefs.cheeseCap??1);
+  }
+  if(cand.kind==='center'){
+    if(sameTile)score+=80;
+    const k=targetKey('center',cand.x,cand.y);
+    const pressure=counts.center.get(k)||0;
+    score-=CENTER_PRESSURE_PENALTY[Math.min(pressure,CENTER_PRESSURE_PENALTY.length-1)]*(prefs.centerCrowd??1);
+  }
+  return score;
+}
+function chooseTargetCandidate(unit,board=state.board){
+  const candidates=buildTargetCandidates(unit,board);
+  if(!candidates.length)return null;
+  const counts=targetCrowdCounts(unit.id);
+  let best=null;
+  for(const cand of candidates){
+    const score=scoreTargetCandidate(unit,cand,counts);
+    const ranked={...cand,score};
+    if(!best||ranked.score>best.score||ranked.score===best.score&&(ranked.path.length<best.path.length||ranked.kind==='center'&&best.kind!=='center'))best=ranked;
+  }
+  return best;
+}
+function requestTargetRecalc(reason='general',force=false){
+  if(!state)return;
+  state.lastTargetRecalc={reason,time:state.time||0};
+  for(const u of state.units.filter(u=>!u.dead)){
+    if(force||!u.move)recalc(u,force);
+    else if(reason==='objectiveRemoved'||reason==='unitDied'||reason==='boardChanged'){
+      if(!currentTargetResult(u,state.board)){u.path=[];}
+    }
+  }
+}
+
 function currentTargetResult(unit, board=state.board){
   if(!unit.target||unit.targetKind==='fallback') return null;
   const start={x:unit.x,y:unit.y};
@@ -1231,34 +1318,13 @@ function currentTargetResult(unit, board=state.board){
   return null;
 }
 function selectNewTarget(unit, board=state.board){
+  const best=chooseTargetCandidate(unit,board);
+  if(best){
+    const result={target:{x:best.x,y:best.y},path:best.path,kind:best.kind};
+    if(best.targetEnemyId)result.targetEnemyId=best.targetEnemyId;
+    return result;
+  }
   const start={x:unit.x,y:unit.y};
-  const goal=testSitePos();
-  const centerPath=bfs(board,start,goal);
-
-  if(unit.cls==='grunt'){
-    if(!teamHasCenterUnit(unit.team) && centerPath) return {target:goal,path:centerPath,kind:'center'};
-    const anyRelic=nearestPathableRelic(board,start);
-    if(teamHasCenterUnit(unit.team) && anyRelic) return {target:{x:anyRelic.r.x,y:anyRelic.r.y},path:anyRelic.p,kind:'relic'};
-    if(centerPath) return {target:goal,path:centerPath,kind:'center'};
-    if(anyRelic) return {target:{x:anyRelic.r.x,y:anyRelic.r.y},path:anyRelic.p,kind:'relic'};
-    const enemy=nearestPathableEnemy(board,start,unit.team);
-    if(enemy) return {target:{x:enemy.e.x,y:enemy.e.y},path:enemy.p,kind:'enemy',targetEnemyId:enemy.e.id};
-  }
-
-  if(unit.cls==='bruiser'){
-    if(centerPath) return {target:goal,path:centerPath,kind:'center'};
-    const enemy=nearestPathableEnemy(board,start,unit.team);
-    if(enemy) return {target:{x:enemy.e.x,y:enemy.e.y},path:enemy.p,kind:'enemy',targetEnemyId:enemy.e.id};
-    const anyRelic=nearestPathableRelic(board,start);
-    if(anyRelic) return {target:{x:anyRelic.r.x,y:anyRelic.r.y},path:anyRelic.p,kind:'relic'};
-  }
-
-  if(unit.cls==='runner'){
-    const anyRelic=nearestPathableRelic(board,start);
-    if(anyRelic) return {target:{x:anyRelic.r.x,y:anyRelic.r.y},path:anyRelic.p,kind:'relic'};
-    if(centerPath) return {target:goal,path:centerPath,kind:'center'};
-  }
-
   const target=fallback(board,start); const p=bfs(board,start,target)||[]; return {target,path:p,kind:'fallback'};
 }
 function pathToTarget(unit, board=state.board){
@@ -1342,6 +1408,7 @@ function tryPlaceTile(team,x,y,source='local'){
   state.lastRotateDebug={ok:true,team,x,y,source,oldType,oldOrientation,newOrientation:t.o,actionsLeft:p.mazeActions};
   if(playMode==='solo'&&team==='B') state.players.A.npcMemory[key(x,y)]=3;
   handleRotationRouteBreaks();
+  requestTargetRecalc('boardChanged',false);
   markBoardDirty();
   renderAll();
   status((team==='B'?'Blue':'Orange')+' placed tile');
@@ -1368,6 +1435,7 @@ function tryRotateTile(team,x,y,source='local'){
   state.lastRotateDebug={ok:true,team,x,y,source,oldOrientation,newOrientation,actionsLeft:p.mazeActions};
   if(playMode==='solo'&&team==='B') state.players.A.npcMemory[key(x,y)]=3;
   handleRotationRouteBreaks();
+  requestTargetRecalc('boardChanged',false);
   markBoardDirty();
   renderAll();
   status((team==='B'?'Blue':'Orange')+' rotating');
@@ -1387,6 +1455,7 @@ function autoRotateCenter(){
   state.lastChanged={x,y,team,pending:true,auto:true};
   state.lastRotateDebug={ok:true,team,x,y,source:'centerTimer',oldOrientation,newOrientation,actionsLeft:'free'};
   handleRotationRouteBreaks();
+  requestTargetRecalc('boardChanged',false);
   markBoardDirty();
   renderAll();
   status('center rotated');
@@ -1466,7 +1535,7 @@ function emitFloatFx({team,x,y,text='+',kind=null,life=720,jitterX=.26,jitterY=.
 function emitPlusFx(team,x,y,variant='default'){const preset=FLOAT_FX_PRESETS[variant]||FLOAT_FX_PRESETS.default; emitFloatFx({team,x,y,text:preset.text,kind:preset.kind});}
 function pulseCheese(r){const el=document.querySelector(`[data-cheese-id="${r.id}"]`); if(!el)return; el.classList.remove('cheeseHit'); void el.offsetWidth; el.classList.add('cheeseHit');}
 function attackCheese(dt){let gainedLocal=false, changed=false; for(const r of state.relics){if(r.claimed)continue; const here=state.units.filter(u=>!u.dead&&u.x===r.x&&u.y===r.y); const teams=[...new Set(here.map(u=>u.team))]; if(teams.length!==1)continue; const team=teams[0]; for(const u of here){if(u.cd<=0&&r.hp>0){const stats=statsFor(u.team,u.cls); const dealt=Math.min(r.hp,stats.damage); r.hp-=dealt; r.lastDamagedBy=team; u.cd=stats.interval; changed=true; if(dealt>0){pulseCheese(r); if(CHEESE_XP_PER_HP>0)emitPlusFx(team,r.x,r.y,'goldPlus');} if(awardXP(team,dealt*CHEESE_XP_PER_HP)&&team===localTeam)gainedLocal=true;}}} if(changed){if(gainedLocal){renderUpgrades(); pulse('#upgradeRing');}}}
-function cleanupCheese(){for(const r of state.relics){if(!r.claimed&&r.hp<=0){r.claimed=true; if(r.lastDamagedBy)state.players[r.lastDamagedBy].claimedCheese++;}} const before=state.relics.length; state.relics=state.relics.filter(r=>!r.claimed); if(before!==state.relics.length){markBoardDirty(); renderUpgrades();}}
+function cleanupCheese(){for(const r of state.relics){if(!r.claimed&&r.hp<=0){r.claimed=true; if(r.lastDamagedBy)state.players[r.lastDamagedBy].claimedCheese++;}} const before=state.relics.length; state.relics=state.relics.filter(r=>!r.claimed); if(before!==state.relics.length){requestTargetRecalc('objectiveRemoved',false); markBoardDirty(); renderUpgrades();}}
 function combat(dt){const damage=new Map(); let gainedLocal=false; for(const u of state.units.filter(u=>!u.dead)){const enemies=state.units.filter(v=>!v.dead&&v.team!==u.team&&v.x===u.x&&v.y===u.y); if(enemies.length && u.cd<=0){enemies.sort((a,b)=>a.entered-b.entered||a.id-b.id); const target=enemies[0]; const stats=statsFor(u.team,u.cls); const cur=damage.get(target.id)||{dmg:0,team:u.team}; cur.dmg+=stats.damage; cur.team=u.team; damage.set(target.id,cur); u.cd=stats.interval;}} for(const [id,hit] of damage){const u=state.units.find(x=>x.id===id); if(u){const before=Math.max(0,u.hp); const dealt=Math.min(before,hit.dmg); u.hp-=hit.dmg; u.lastDamagedBy=hit.team; u.deathCause=null; if(COMBAT_XP_PER_HP>0&&dealt>0&&awardXP(hit.team,dealt*COMBAT_XP_PER_HP)&&hit.team===localTeam)gainedLocal=true;}} if(damage.size) state.centerFightSeen=state.time; if(gainedLocal){renderUpgrades(); pulse('#upgradeRing');}}
 function chooseTestSiteX(prevX=null){
   const candidates=[1,2,3,4,5].filter(x=>x!==prevX);
@@ -1480,7 +1549,7 @@ function spawnTestSite(initial=false){
   markBoardDirty();
   recalcAllUnits(true);
 }
-function recalcAllUnits(force=false){if(!state)return; for(const u of state.units.filter(u=>!u.dead))recalc(u,force);}
+function recalcAllUnits(force=false){requestTargetRecalc('manual',force);}
 function testSiteScoringTeam(){if(!state?.testSite||!state.testSite.active)return null; const t=state.testSite; const here=state.units.filter(u=>!u.dead&&u.x===t.x&&u.y===t.y); const hasA=here.some(u=>u.team==='A'), hasB=here.some(u=>u.team==='B'); if(hasA&&!hasB)return 'A'; if(hasB&&!hasA)return 'B'; return null;}
 function updateTestSite(dt){
   if(!state.testSite)spawnTestSite(true);
@@ -1524,11 +1593,11 @@ function updateTestSite(dt){
   }
 }
 function centerDamage(dt){updateTestSite(dt);}
-function cleanupDeaths(){const dead=state.units.filter(u=>!u.dead&&u.hp<=0); for(const u of dead){u.dead=true; addDeathSplat(u); if(u.deathCause!=='center'&&u.lastDamagedBy){awardXP(u.lastDamagedBy,UNIT[u.cls].xp*UNIT_KILL_XP_MULT);}} if(dead.length){state.units=state.units.filter(u=>!u.dead); markBoardDirty();}}
+function cleanupDeaths(){const dead=state.units.filter(u=>!u.dead&&u.hp<=0); for(const u of dead){u.dead=true; addDeathSplat(u); if(u.deathCause!=='center'&&u.lastDamagedBy){awardXP(u.lastDamagedBy,UNIT[u.cls].xp*UNIT_KILL_XP_MULT);}} if(dead.length){state.units=state.units.filter(u=>!u.dead); requestTargetRecalc('unitDied',false); markBoardDirty();}}
 function convertXP(){let gainedLocal=false; for(const p of [state.players.A,state.players.B]) while(p.xp>=UPGRADE_XP_COST){p.xp-=UPGRADE_XP_COST;p.up++; if(p.team===localTeam)gainedLocal=true;} if(gainedLocal){renderUpgrades(); pulse('#upgradeRing');}}
 function centerScore(dt){}
 function gainScore(team,amount){const p=state.players[team]; p.scoreMeter+=amount; while(p.scoreMeter>=1){p.scoreMeter-=1;p.score++; pulse('#scoreMeter');}}
-function spawnCheese(){const top=state.relics.some(r=>r.y<=2), bot=state.relics.some(r=>r.y>=4); if(!top){const x=Math.random()<.5?1:5; state.relics.push({id:rid++,x,y:2,hp:RELIC_HP,maxHp:RELIC_HP}); markBoardDirty();} if(!bot){const x=Math.random()<.5?1:5; state.relics.push({id:rid++,x,y:4,hp:RELIC_HP,maxHp:RELIC_HP}); markBoardDirty();}}
+function spawnCheese(){let spawned=false; const top=state.relics.some(r=>r.y<=2), bot=state.relics.some(r=>r.y>=4); if(!top){const x=Math.random()<.5?1:5; state.relics.push({id:rid++,x,y:2,hp:RELIC_HP,maxHp:RELIC_HP}); spawned=true; markBoardDirty();} if(!bot){const x=Math.random()<.5?1:5; state.relics.push({id:rid++,x,y:4,hp:RELIC_HP,maxHp:RELIC_HP}); spawned=true; markBoardDirty();} if(spawned)requestTargetRecalc('objectiveSpawned',false);}
 function applyUpgrades(){for(const p of [state.players.A,state.players.B]){for(const cls of p.queuedUp.splice(0)){buyApply(p,cls);}}}
 function buyReq(p,cls){return !!UNIT_UPGRADE[cls] && p.up>=1;}
 function queueUpgrade(team,cls){const p=state.players[team]; if(!buyReq(p,cls))return false; p.up--; buyApply(p,cls); if(team===localTeam){const btn=upgradePrompt?.querySelector(`[data-upgrade="${cls}"]`); if(btn){btn.classList.add('chosen'); const lvl=btn.querySelector('.lvl'); if(lvl)lvl.textContent=p.unitLevel[cls]||0;} pulse('#upgradeRing'); setTimeout(()=>renderUpgrades(),170);} renderAll(); broadcastState(true); return true;}
